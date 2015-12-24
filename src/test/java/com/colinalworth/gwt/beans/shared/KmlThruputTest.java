@@ -218,6 +218,5 @@ AtomicLong time=new AtomicLong(0);
             double v = time.get();
             System.out.println(bytes[0] + " bytes in " + (v / 1000.0) + " seconds, " + bytes[0] / time.get() * 1000.0 / 1024.0 / 1024.0 + "mb/second");
         }
-
     }
 }

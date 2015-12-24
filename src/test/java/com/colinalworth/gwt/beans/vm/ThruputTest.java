@@ -3,27 +3,29 @@ package com.colinalworth.gwt.beans.vm;
 import com.colinalworth.gwt.beans.shared.ByteSplittable;
 import com.colinalworth.gwt.beans.shared.Results;
 import com.colinalworth.gwt.beans.shared.ResultsBean;
+import com.colinalworth.gwt.beans.shared.ShallowSplittable;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
+import com.google.gwt.user.client.Random;
 import com.google.web.bindery.autobean.shared.AutoBeanCodex;
+import com.google.web.bindery.autobean.shared.Splittable;
 import com.google.web.bindery.autobean.vm.AutoBeanFactorySource;
-
 import org.junit.Before;
 import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.SimpleFileVisitor;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
 public class ThruputTest {
@@ -32,6 +34,14 @@ public class ThruputTest {
 
     private List<Path> files;
     private boolean readGuids = true;
+
+    //the way this test chops wood, the faster your cpu, the slower the unit test.
+    private ByteBuffer removeFastCpuPenalty(Path file) throws IOException {
+        if(!cache.containsKey(file)){
+            ByteBuffer wrap = ByteBuffer.wrap(Files.readAllBytes(file));
+            cache.put(file, wrap);}
+        return (ByteBuffer) cache.get(file).rewind();
+    }
 
     @Before
     public void getPaths() {
@@ -62,7 +72,7 @@ public class ThruputTest {
                 Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
                     @Override
                     public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                        ByteBuffer bb = ByteBuffer.wrap(Files.readAllBytes(file));
+                        ByteBuffer bb = removeFastCpuPenalty(file);
                         ByteSplittable splittable = new ByteSplittable(bb);
                         if (readGuids) {
                             guids.add(splittable.get("guid").asString());
@@ -70,6 +80,7 @@ public class ThruputTest {
 
                         return FileVisitResult.CONTINUE;
                     }
+
                 });
             }
         }
@@ -87,7 +98,7 @@ public class ThruputTest {
                 Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
                     @Override
                     public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                        ByteBuffer bb = ByteBuffer.wrap(Files.readAllBytes(file));
+                        ByteBuffer bb = removeFastCpuPenalty(file);
                         bytes[0] += bb.limit();
                         long start = System.currentTimeMillis();
                         ByteSplittable splittable = new ByteSplittable(bb);
@@ -118,7 +129,7 @@ public class ThruputTest {
                 Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
                     @Override
                     public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                        ByteBuffer bb = ByteBuffer.wrap(Files.readAllBytes(file));
+                        ByteBuffer bb = removeFastCpuPenalty(file);
                         ByteSplittable splittable = new ByteSplittable(bb);
                         Results results = AutoBeanCodex.decode(abf, Results.class, splittable).as();
                         if (readGuids) {
@@ -145,7 +156,7 @@ public class ThruputTest {
                 Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
                     @Override
                     public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                        ByteBuffer bb = ByteBuffer.wrap(Files.readAllBytes(file));
+                        ByteBuffer bb = removeFastCpuPenalty(file);
                         bytes[0] += bb.limit();
                         long start = System.currentTimeMillis();
                         ByteSplittable splittable = new ByteSplittable(bb);
@@ -178,7 +189,9 @@ public class ThruputTest {
                 Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
                     @Override
                     public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                        String json = new String(Files.readAllBytes(file));
+                        ByteBuffer bb = removeFastCpuPenalty(file);
+
+                        String json = new String(bb.array());
                         JsonElement outer = gson.parse(json);
                         if (readGuids) {
                             guids.add(outer.getAsJsonObject().get("guid").getAsString());
@@ -202,7 +215,9 @@ public class ThruputTest {
                 Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
                     @Override
                     public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                        byte[] ba = Files.readAllBytes(file);
+
+                        ByteBuffer bb = removeFastCpuPenalty(file);
+                        byte[] ba = bb.array();
                         bytes[0] += ba.length;
                         String json = new String(ba);
                         long start = System.currentTimeMillis();
@@ -232,7 +247,8 @@ public class ThruputTest {
                 Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
                     @Override
                     public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                        String json = new String(Files.readAllBytes(file));
+                        ByteBuffer bb = removeFastCpuPenalty(file);
+                        String json = new String(String.valueOf(StandardCharsets.UTF_8.decode(bb)));
                         ResultsBean results = gson.fromJson(json, ResultsBean.class);
                         if (readGuids) {
                             guids.add(results.getGuid());
@@ -257,7 +273,9 @@ public class ThruputTest {
                 Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
                     @Override
                     public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                        byte[] ba = Files.readAllBytes(file);
+                        ByteBuffer bb = removeFastCpuPenalty(file);
+
+                        byte[] ba = bb.array();
                         bytes[0] += ba.length;
                         String json = new String(ba);
                         long start = System.currentTimeMillis();
@@ -286,7 +304,7 @@ public class ThruputTest {
                 Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
                     @Override
                     public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                        ByteBuffer bb = ByteBuffer.wrap(Files.readAllBytes(file));
+                        ByteBuffer bb = removeFastCpuPenalty(file);
                         ShallowSplittable.create(bb);
                         return FileVisitResult.CONTINUE;
                     }
@@ -307,7 +325,7 @@ public class ThruputTest {
                 Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
                     @Override
                     public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                        ByteBuffer bb = ByteBuffer.wrap(Files.readAllBytes(file));
+                        ByteBuffer bb = removeFastCpuPenalty(file);
                         bytes[0] += bb.limit();
                         long start = System.currentTimeMillis();
                         Splittable splittable = ShallowSplittable.create(bb);
@@ -325,33 +343,35 @@ public class ThruputTest {
             System.out.println("ShallowSplittable on " + path);
             System.out.println(bytes[0] + " bytes in " + (time[0] / 1000.0) + " seconds, " + bytes[0] / time[0] * 1000.0 / 1024.0 / 1024.0 + "mb/second");
         }
-        @Test
+    }
+    final Map<Path,ByteBuffer> cache=new HashMap<>();
+
+    static long ignored=new java.util.Random().nextInt()&0xffffffff;
+
+    @Test
         public void testPlaceboSplit() throws IOException {
             for (Path path : files) {
                 final double[] bytes = {0};
                 final double[] time = {0};
                 final List<String> guids = new ArrayList<>();
-                while (time[0] < 1000) {
-                    Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
-                        @Override
-                        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                            ByteBuffer bb = ByteBuffer.wrap(Files.readAllBytes(file));
-                            bytes[0] += bb.limit();
-                            long start = System.currentTimeMillis();
-                            while (bb.hasRemaining()) bb.get();
+                while (time[0] < 1000) Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
+                    @Override
+                    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
 
-                            time[0] += System.currentTimeMillis() - start;
+                        ByteBuffer bb = removeFastCpuPenalty(file);
+                        bytes[0] += bb.limit();
+                        long start = System.currentTimeMillis();
 
-                            return FileVisitResult.CONTINUE;
-                        }
-                    });
-                }
-
+                        while (bb.hasRemaining() ) ignored+=bb.get()&0xff;
+                        time[0] += System.currentTimeMillis() - start;
+                        return FileVisitResult.CONTINUE;
+                    }
+                });
                 System.out.println("Placebo on " + path);
                 System.out.println(bytes[0] + " bytes in " + (time[0] / 1000.0) + " seconds, " + bytes[0] / time[0] * 1000.0 / 1024.0 / 1024.0 + "mb/second");
+                System.out.println("unoptimizable sum: "+ignored);
             }
 
         }
 
     }
-}

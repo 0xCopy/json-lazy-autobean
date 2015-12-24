@@ -4,10 +4,7 @@ import com.google.web.bindery.autobean.shared.Splittable;
 
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class ByteSplittable implements Splittable {
 
