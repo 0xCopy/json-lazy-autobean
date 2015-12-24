@@ -21,10 +21,10 @@ public class ByteSplittable implements Splittable {
   private static final int NUMBER = 0x2;
   private static final int BOOLEAN = 0x3;
 
-  private static final int OBJECT_START = PARENT;//with OBJ_MASK checks if is object
-  private static final int OBJECT_END = PARENT + END_MASK;
+  private static final int OBJECT_START = PARENT + 0x0;//with OBJ_MASK checks if is object
+//  private static final int OBJECT_END = PARENT + END_MASK;
   private static final int ARRAY_START = PARENT + 0x2;//with OBJ_MASK checks if is array
-  private static final int ARRAY_END = PARENT + 0x2 + END_MASK;
+//  private static final int ARRAY_END = PARENT + 0x2 + END_MASK;
 
 
   private static boolean isPrimitive(int offset) {
@@ -68,13 +68,12 @@ public class ByteSplittable implements Splittable {
 
       collectValue();
 
-      buffer.rewind();
       offsets.flip();
       offsets.get();
+      buffer.position(offsets.get(0) >> TYPE_BITS);
     }
 
     private void collectPairs() {
-      final int lastOffset = offset;
       final int initialOffset = buffer.position() - 1;
       consumeWhitespace(buffer);
       peek = buffer.get(buffer.position());
@@ -99,13 +98,13 @@ public class ByteSplittable implements Splittable {
             //either comma or }
             if (!consumeWhitespaceAndOptionalComma(buffer)) {
               peek = buffer.get();
-              assert peek == '}' : Character.getName(peek);
+              assert peek == '}';// : Character.getName(peek);
               consumeWhitespace(buffer);
               return;
             }
             break;
           default:
-            assert false : "invalid token " + Character.getName(peek);
+            assert false;// : "invalid token " + Character.getName(peek);
         }
       }
     }
@@ -125,7 +124,7 @@ public class ByteSplittable implements Splittable {
         if (!consumeWhitespaceAndOptionalComma(buffer)) {
           //whitespace consumed, failed to find comma, must be ]
           peek = buffer.get();
-          assert peek == ']' : Character.getName(peek);
+          assert peek == ']';// : Character.getName(peek);
           consumeWhitespace(buffer);
           return;
         }
@@ -181,7 +180,7 @@ public class ByteSplittable implements Splittable {
           consumeNumber(buffer);
           break;
         default:
-          assert false : "Unexpected " + Character.getName(buffer.get(buffer.position() - 1));
+          assert false;// : "Unexpected " + Character.getName(buffer.get(buffer.position() - 1));
       }
       consumeWhitespace(buffer);
     }
@@ -198,11 +197,11 @@ public class ByteSplittable implements Splittable {
   private static void consumeWhitespace(ByteBuffer buffer) {
     do {
       buffer.mark();
-    } while (buffer.hasRemaining() && Character.isWhitespace(buffer.get()));
+    } while (buffer.hasRemaining() && isWhitespace(buffer.get()));
     buffer.reset();
   }
 
-  private static void consumeString(ByteBuffer buffer) {
+  public static void consumeString(ByteBuffer buffer) {
     //TODO unicode wat?
     while (buffer.hasRemaining()) {
       byte current = buffer.get();
@@ -214,32 +213,35 @@ public class ByteSplittable implements Splittable {
 //            throw new IllegalStateException("can't end mid-string in an escape sequence");
 //          }
           byte next = buffer.get();
-          switch (next) {
-            case '"':
-            case '\\':
-            case '/':
-            case 'b':
-            case 'f':
-            case 'n':
-            case 'r':
-            case 't':
-              continue;
-            case 'u':
-              byte[] next4 = new byte[4];
-              buffer.get(next4);
-              for (int i = 0; i < next4.length; i++) {
-                if (!(next4[i] >= '0' && next4[i] <= '9') &&
-                        !(next4[i] >='a' && next4[i] <= 'f'))
-                  throw new IllegalStateException("Illegal unicode: " + Arrays.toString(next4));
-              }
-            default:
-              throw new IllegalStateException("Illegal escape: \\" + Character.getName(next));
-          }
+//          switch (next) {
+//            case '"':
+//            case '\\':
+//            case '/':
+//            case 'b':
+//            case 'f':
+//            case 'n':
+//            case 'r':
+//            case 't':
+//              continue;
+//            case 'u':
+//              byte[] next4 = new byte[4];
+//              buffer.get(next4);
+//              for (int i = 0; i < next4.length; i++) {
+//                if (!(next4[i] >= '0' && next4[i] <= '9') &&
+//                        !(next4[i] >='a' && next4[i] <= 'f'))
+//                  throw new IllegalStateException("Illegal unicode: " + Arrays.toString(next4));
+//              }
+//            default:
+//              throw new IllegalStateException("Illegal escape: \\" + Character.getName(next));
+//
+//          }
       }
     }
+    throw new IllegalStateException("can't end mid-string");
+
   }
 
-  private static void consume(ByteBuffer buffer, String remaining) {
+  public static void consume(ByteBuffer buffer, String remaining) {
     buffer.mark();
     int offset = 0;
     while (buffer.hasRemaining() && offset < remaining.length()) {
@@ -251,11 +253,11 @@ public class ByteSplittable implements Splittable {
     }
   }
 
-  private static void consumeNumber(ByteBuffer buffer) {
+  public static void consumeNumber(ByteBuffer buffer) {
     buffer.mark();
     byte next = buffer.get(buffer.position() - 1);//zeroth digit, 0-9 or -
     if (next == '-') {
-      if (!buffer.hasRemaining() || !Character.isDigit(next = buffer.get())) {
+      if (!buffer.hasRemaining() || !Character.isDigit((char)(next = buffer.get()))) {
         throw new IllegalStateException("'-' is not a legal number");
       }
       //next has been advanced, and is 0-9, we're legal, mark it
@@ -268,7 +270,7 @@ public class ByteSplittable implements Splittable {
 //        return;
 //      }
       //going into this loop next is 1-9
-      while (buffer.hasRemaining() && Character.isDigit(next)) {
+      while (buffer.hasRemaining() && Character.isDigit((char)next)) {
         buffer.mark();
         next = buffer.get();
       }
@@ -280,11 +282,11 @@ public class ByteSplittable implements Splittable {
     if (next == '.') {
 //      buffer.mark();//not a legal stopping point, no mark
       next = buffer.get();
-      if (!Character.isDigit(next)) {
+      if (!Character.isDigit((char)next)) {
         //blow up, the '.' must be followed by a digit
         throw new IllegalStateException("'.' must be followed by a digit");
       }
-      while (Character.isDigit(next)) {
+      while (Character.isDigit((char)next)) {
         buffer.mark();
         next = buffer.get();
       }
@@ -295,12 +297,12 @@ public class ByteSplittable implements Splittable {
       if (next == '+' || next == '-') {
         next = buffer.get();
       }
-      if (!Character.isDigit(next)) {
+      if (!Character.isDigit((char)next)) {
         //blow up, (e|E)(+|-|) must be followed by a digit
         throw new IllegalStateException("'e' must be followed by a digit");
       }
 
-      while (Character.isDigit(next)) {
+      while (Character.isDigit((char)next)) {
         buffer.mark();
         next = buffer.get();
       }
@@ -403,73 +405,82 @@ public class ByteSplittable implements Splittable {
   @Override
   public Splittable get(int index) {
     //skip end index
-    offsets.get();
+    int endIndex = offsets.get();
+    assert endIndex <= offsets.limit();
     int i = 0;
-    while (offsets.hasRemaining()) {
+    while (offsets.hasRemaining() && offsets.position() < endIndex) {
       int next = offsets.get();
-      int endOfCurrent = -1;
-      if (!isPrimitive(next)) {
-        endOfCurrent = offsets.get(offsets.position());
-      }
       if (i == index) {
+        if ((next & MASK) == NULL) {
+          offsets.reset();
+          return null;
+        }
         //we've found the right index
-        break;
+        IntBuffer newOffsets = offsets.duplicate();
+        // if we're looking at a parent, consume one more to skip the end position
+        newOffsets.position(offsets.position());
+        newOffsets.mark();
+
+        ByteBuffer newBuffer = buffer.duplicate();
+        newBuffer.position(buffer.position() + (offsets.get(offsets.position() - 1) >> TYPE_BITS));
+        newBuffer.mark();
+
+        offsets.reset();
+        buffer.reset();
+        return new ByteSplittable(newBuffer, newOffsets);
       }
       i++;
 
       if (!isPrimitive(next)) {
         //if we just finished a non-primitive, fast forward ahead to the end of that
-        offsets.position(endOfCurrent);
+        offsets.position(offsets.get());
       }
     }
-    IntBuffer newOffsets = offsets.duplicate();
-    // if we're looking at a parent, consume one more to skip the end position
-    newOffsets.position(offsets.position());
-    newOffsets.mark();
-
-    ByteBuffer newBuffer = buffer.duplicate();
-    newBuffer.position(buffer.position() + (offsets.get(offsets.position() - 1) >> TYPE_BITS));
-    newBuffer.mark();
 
     offsets.reset();
-    buffer.reset();
-    return new ByteSplittable(newBuffer, newOffsets);
+    return null;
   }
 
   @Override
   public Splittable get(String key) {
     //skip end index
-    offsets.get();
-    while (offsets.hasRemaining()) {
+    int endIndex = offsets.get();
+    assert endIndex <= offsets.limit();
+    while (offsets.hasRemaining() && offsets.position() < endIndex) {
       int keyOffset = offsets.get();
-      int endOfCurrent = -1;
-      if (!isPrimitive(keyOffset)) {
-        endOfCurrent = offsets.get(offsets.position());
-      }
+      assert isString(keyOffset) : Integer.toHexString(keyOffset & MASK);
 
       //even numbered entries are keys
-      if (isString(keyOffset) && matches(buffer, (keyOffset >> TYPE_BITS) + buffer.position() + 1, key, true)) {
+      if (matches(buffer, (keyOffset >> TYPE_BITS) + buffer.position() + 1, key, true)) {
         //advance one more to the value
-        offsets.get();
-        break;
+        int value = offsets.get();
+        if ((value & MASK) == NULL) {
+          offsets.reset();
+          return null;
+        }
+        IntBuffer newOffsets = offsets.duplicate();
+        newOffsets.position(offsets.position());
+        newOffsets.mark();
+
+        ByteBuffer newBuffer = buffer.duplicate();
+        newBuffer.position(buffer.position() + (offsets.get(offsets.position() - 1) >> TYPE_BITS));
+        newBuffer.mark();
+
+        offsets.reset();
+        buffer.reset();
+        return new ByteSplittable(newBuffer, newOffsets);
       }
 
-      if (!isPrimitive(keyOffset)) {
+      //move to the value that we are ignoring, and if an object/array, skip to the end
+      int valueOffset = offsets.get();
+      if (!isPrimitive(valueOffset)) {
         //if we just finished a non-primitive, fast forward ahead to the end of that
-        offsets.position(endOfCurrent);
+        offsets.position(offsets.get());
       }
     }
-    IntBuffer newOffsets = offsets.duplicate();
-    newOffsets.position(offsets.position());
-    newOffsets.mark();
-
-    ByteBuffer newBuffer = buffer.duplicate();
-    newBuffer.position(buffer.position() + (offsets.get(offsets.position() - 1) >> TYPE_BITS));
-    newBuffer.mark();
 
     offsets.reset();
-    buffer.reset();
-    return new ByteSplittable(newBuffer, newOffsets);
+    return null;
   }
 
   private boolean matches(ByteBuffer buffer, int index, String target, boolean endsWithQuote) {
@@ -497,7 +508,40 @@ public class ByteSplittable implements Splittable {
 
   @Override
   public List<String> getPropertyKeys() {
-    return null;  //To change body of implemented methods use File | Settings | File Templates.
+    assert isKeyed() : "getPropertyKeys() not supported for non-objects";
+    List<String> keys = new ArrayList<>();
+    int start = getFirstIndex();
+
+    //skip end index
+    int endIndex = offsets.get();
+    assert endIndex <= offsets.limit();
+    while (offsets.hasRemaining() && offsets.position() < endIndex) {
+      int keyOffset = offsets.get();
+      assert isString(keyOffset) : Integer.toHexString(keyOffset & MASK);
+
+      int offset = start + (keyOffset >> TYPE_BITS);
+      buffer.position(offset + 2);//consume assumes we already consumed the open quote
+      consumeString(buffer);
+      int end = buffer.position() - 2;//ignore both quotes
+
+      byte[] bytes = new byte[end - offset];
+      buffer.position(offset + 1);//ignore leading quote
+      buffer.get(bytes);
+      keys.add(new String(bytes));
+
+      //skip value
+      int valueOffset = offsets.get();
+      if (!isPrimitive(valueOffset)) {
+        //if we just finished a non-primitive, fast forward ahead to the end of that
+        offsets.position(offsets.get());
+      }
+    }
+
+    //consume moves the marker, move it back and position back to 0
+    buffer.position(start).mark();
+    //TODO consider caching this until we support writing
+    offsets.reset();
+    return keys;
   }
 
   @Override
@@ -547,7 +591,7 @@ public class ByteSplittable implements Splittable {
 
   @Override
   public boolean isUndefined(String key) {
-    return false;
+    return isNull(key);
   }
 
   @Override
@@ -562,7 +606,23 @@ public class ByteSplittable implements Splittable {
 
   @Override
   public int size() {
-    return 0;  //To change body of implemented methods use File | Settings | File Templates.
+    assert isIndexed() : "size() not supported for non-arrays";
+    int size = 0;
+    int endIndex = offsets.get();
+
+    while (offsets.position() < endIndex) {
+      size++;
+      int next = offsets.get();
+
+      if (!isPrimitive(next)) {
+        //if we just finished a non-primitive, fast forward ahead to the end of that
+        offsets.position(offsets.get());
+      }
+    }
+
+    offsets.reset();
+    //TODO cache this value, until we support writing
+    return size;
   }
 
 
@@ -572,6 +632,10 @@ public class ByteSplittable implements Splittable {
 
   private int getFirstTypeDetails() {
     return offsets.get(offsets.position() - 1);
+  }
+
+  private static boolean isWhitespace(byte possibleWhitespace) {
+    return possibleWhitespace == ' ' || possibleWhitespace == '\t' || possibleWhitespace == '\r' || possibleWhitespace == '\n';
   }
 
 }
