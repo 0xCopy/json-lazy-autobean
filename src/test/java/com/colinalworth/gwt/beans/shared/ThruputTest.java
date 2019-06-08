@@ -44,6 +44,7 @@ public class ThruputTest {
     }
 
 
+/*
     @Test
     public void testPlaceboSplit() throws IOException {
         for (Path path : files) {
@@ -71,6 +72,7 @@ public class ThruputTest {
         }
 
     }
+*/
     public void warmupBBSplit() throws IOException {
         long start = System.currentTimeMillis();
         while (start + 1000 * WARMUP_SECONDS > System.currentTimeMillis()) {
@@ -140,7 +142,7 @@ public class ThruputTest {
 
     @Test
     public void testLazySplit() throws IOException {
-//        warmupLazySplit();
+        warmupLazySplit();
 
         for (Path path : files) {
             final double[] bytes = {0};
